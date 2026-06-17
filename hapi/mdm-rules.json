@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "mdmTypes": [
+    {
+      "mdmType": "Patient",
+      "eidSystems": [
+        "https://philsys.gov.ph/identifier/psn",
+        "https://philhealth.gov.ph/identifier/member-id"
+      ],
+      "matching": {
+        "algorithm": "SIMILARITY",
+        "matchFields": [
+          {
+            "name": "birthdate",
+            "resourceType": "Patient",
+            "resourcePath": "birthDate",
+            "matcher": {
+              "algorithm": "DATE"
+            }
+          },
+          {
+            "name": "given",
+            "resourceType": "Patient",
+            "resourcePath": "name.given",
+            "matcher": {
+              "algorithm": "STRING",
+              "exact": false
+            }
+          },
+          {
+            "name": "family",
+            "resourceType": "Patient",
+            "resourcePath": "name.family",
+            "matcher": {
+              "algorithm": "STRING",
+              "exact": false
+            }
+          },
+          {
+            "name": "gender",
+            "resourceType": "Patient",
+            "resourcePath": "gender",
+            "matcher": {
+              "algorithm": "STRING",
+              "exact": true
+            }
+          }
+        ]
+      },
+      "candidateSearchParams": [
+        {
+          "resourceType": "Patient",
+          "searchParam": "birthdate"
+        },
+        {
+          "resourceType": "Patient",
+          "searchParam": "family"
+        }
+      ],
+      "candidateFilterSearchParams": [],
+      "matchResultMap": {
+        "given-exact,family-exact,birthdate-exact,gender-exact": "MATCH",
+        "given-similar,family-similar,birthdate-exact": "POSSIBLE_MATCH",
+        "given-exact,family-exact,birthdate-exact": "MATCH"
+      },
+      "eidSystemsForFetch": [
+        "https://philsys.gov.ph/identifier/psn",
+        "https://philhealth.gov.ph/identifier/member-id"
+      ]
+    }
+  ]
+}

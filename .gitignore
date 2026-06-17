@@ -1,0 +1,22 @@
+# Upload result directories produced by scripts/upload.sh
+fhir-upload-results-*/
+
+# Local environment overrides — never commit
+.env
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Python
+__pycache__/
+*.pyc
+
+# Temporary files
+*.tmp
+*.bak

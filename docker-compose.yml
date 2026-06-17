@@ -1,0 +1,55 @@
+services:
+
+  # HAPI FHIR R4 server with MDM and repository validation enabled.
+  # Packages fhir.ph.core and fhir.ph.ereferral are loaded on first boot.
+  # Access at http://localhost:8080/fhir
+  # See docs/configuration.md for all settings.
+  fhir:
+    container_name: ph-cdr-hapi
+    image: "hapiproject/hapi:v8.10.0-1"
+    ports:
+      - "8080:8080"
+    # Explicit DNS avoids systemd-resolved stub resolver failures on Ubuntu hosts.
+    # The default Docker bridge inherits 127.0.0.53 from systemd-resolved, which
+    # is unreachable from inside containers. Remove this block on Docker Desktop,
+    # RHEL/CentOS, or any host where containers already have working DNS.
+    # See docs/known-issues.md#b-dns-on-systemd-resolved-ubuntu-hosts
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    environment:
+      PH_CORE_VERSION: "${PH_CORE_VERSION:-0.1.1}"
+      PH_EREFERRAL_VERSION: "${PH_EREFERRAL_VERSION:-0.3.1}"
+    configs:
+      - source: hapi-application
+        target: /app/config/application.yaml
+      - source: hapi-mdm-rules
+        target: /app/config/mdm-rules.json
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # PostgreSQL database backend for HAPI FHIR.
+  db:
+    image: "postgres:17.2-bookworm"
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: admin
+      POSTGRES_USER: admin
+      POSTGRES_DB: hapi
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d hapi"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - hapi.postgres.data:/var/lib/postgresql/data
+
+volumes:
+  hapi.postgres.data:
+
+configs:
+  hapi-application:
+    file: hapi/application.yaml
+  hapi-mdm-rules:
+    file: hapi/mdm-rules.json

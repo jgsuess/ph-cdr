@@ -1,0 +1,86 @@
+spring:
+  datasource:
+    # Connects to the PostgreSQL container defined in docker-compose.yml.
+    # "db" resolves to the db service hostname within the Docker network.
+    # See docs/configuration.md#spring-datasource for production credential guidance.
+    url: 'jdbc:postgresql://db:5432/hapi'
+    username: admin
+    password: admin
+    driverClassName: org.postgresql.Driver
+  jpa:
+    properties:
+      # HAPI's PostgreSQL-specific Hibernate dialect. Required — do not substitute.
+      hibernate.dialect: ca.uhn.fhir.jpa.model.dialect.HapiFhirPostgresDialect
+      # Disable Hibernate Search (Lucene/ES full-text). Not needed for FHIR search.
+      hibernate.search.enabled: false
+
+hapi:
+  fhir:
+    fhir_version: R4
+
+    # Large code systems (v3-Race, v3-ActCode, etc.) are indexed synchronously on
+    # first boot rather than deferred to background jobs. Slower first boot, but
+    # eliminates the startup race where valid codes return false for ~30s.
+    # See docs/configuration.md#terminology-deferred-indexing
+    defer_indexing_for_codesystems_of_size: 100000
+
+    # Repository validation: rejects writes that fail active profile conformance.
+    # Note: profiles with status=draft are loaded but not enforced on writes.
+    # See docs/known-issues.md#c-profile-validation-inactive-for-draft-status-igs
+    validation:
+      requests_enabled: true
+      responses_enabled: false
+
+    # MDM: automatic patient deduplication using PhilSys/PhilHealth EIDs and
+    # name+DOB similarity. Rules file is mounted at /app/config/mdm-rules.json.
+    # See docs/configuration.md#hapimdm-rulesjson
+    mdm_enabled: true
+    mdm_rules_json_location: "mdm-rules.json"
+
+    # Allow references to resources hosted on external FHIR servers.
+    # Required by Philippine IGs that reference national registry identifiers.
+    allow_external_references: true
+
+    # Remote terminology services for codes not resolvable locally.
+    # Requires outbound internet access from the container.
+    # See docs/configuration.md#remote-terminology-services for offline alternatives.
+    remote_terminology_service:
+      loinc:
+        system: "http://loinc.org"
+        url: "https://tx.fhirlab.net/fhir"
+      snomed:
+        system: "http://snomed.info/sct"
+        url: "https://tx.fhirlab.net/fhir"
+      ucum:
+        # Note: tx.fhirlab.net does not support UCUM; use HL7 reference server.
+        # The UCUM fragment (scripts/upload.sh step 1b) handles codes listed there.
+        # See docs/known-issues.md#a-hapi-v8100-ucum-chain-regression--issue-7796
+        system: "http://unitsofmeasure.org"
+        url: "https://tx.fhir.org/r4"
+
+    # Pre-load Philippine FHIR packages on first boot.
+    # Use PH_CORE_VERSION / PH_EREFERRAL_VERSION env vars to override versions.
+    # reloadExisting: false means subsequent restarts skip re-download (fast).
+    # See docs/configuration.md#implementation-guides and docs/adding-igs.md
+    implementationguides:
+      ph_core:
+        name: fhir.ph.core
+        version: "${PH_CORE_VERSION:0.1.1}"
+        reloadExisting: false
+        installMode: STORE_AND_INSTALL
+        fetchDependencies: true
+        packageUrl: "https://jgsuess.github.io/ph-core/${PH_CORE_VERSION:0.1.1}/package.tgz"
+        dependencyExcludes:
+          - "hl7.fhir.uv.extensions"
+          - "hl7.terminology"
+      ph_ereferral:
+        name: fhir.ph.ereferral
+        version: "${PH_EREFERRAL_VERSION:0.3.1}"
+        reloadExisting: false
+        installMode: STORE_AND_INSTALL
+        fetchDependencies: true
+        packageUrl: "https://jgsuess.github.io/ph-ereferral/${PH_EREFERRAL_VERSION:0.3.1}/package.tgz"
+        dependencyExcludes:
+          - "hl7.fhir.uv.extensions"
+          - "hl7.terminology"
+          - "fhir.ph.core"
