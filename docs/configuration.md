@@ -36,13 +36,21 @@ spring:
   jpa:
     properties:
       hibernate.dialect: ca.uhn.fhir.jpa.model.dialect.HapiFhirPostgresDialect
-      hibernate.search.enabled: false
+      hibernate.search.enabled: true
+      hibernate.search.backend.type: lucene
+      hibernate.search.backend.directory.root: /data/hapi/lucenefiles
 ```
 
 | Setting | Value | Notes |
 |---|---|---|
 | `hibernate.dialect` | `HapiFhirPostgresDialect` | HAPI's PostgreSQL-specific dialect. Required for correct schema generation and JSON column handling. Do not swap for a generic PostgreSQL dialect — HAPI relies on dialect-specific SQL extensions. |
-| `hibernate.search.enabled` | `false` | Disables Hibernate Search (Lucene/Elasticsearch full-text indexing). HAPI uses its own SQL-based FHIR search; Hibernate Search is only needed for `_text` or `_content` search parameters, which are not used here. Enabling it requires configuring a backend and increases memory by ~500 MB. |
+| `hibernate.search.enabled` | `true` | Enables Hibernate Search with the Lucene backend. Required for `_text` and `_content` FHIR search parameters. Adds ~500 MB memory and increases first-boot time as all stored resources are indexed. |
+| `hibernate.search.backend.type` | `lucene` | Uses the embedded Lucene engine rather than an external Elasticsearch/OpenSearch cluster. Appropriate for single-node deployments. |
+| `hibernate.search.backend.directory.root` | `/data/hapi/lucenefiles` | Filesystem path inside the container where Lucene writes its index files. Mounted as the `hapi.lucene.data` named volume in `docker-compose.yml` to persist across container restarts. |
+
+**Disabling Lucene**: set `hibernate.search.enabled: false` and remove the `hibernate.search.backend.*` lines, and drop the `hapi.lucene.data` volume from `docker-compose.yml`. The `_text` and `_content` search parameters will return an error.
+
+**Index rebuild**: if you wipe the volume (`docker compose down -v`) the Lucene index is rebuilt automatically on next boot as HAPI re-indexes stored resources from PostgreSQL. This adds time proportional to the number of stored resources.
 
 ### FHIR Version
 
