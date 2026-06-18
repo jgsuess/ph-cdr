@@ -118,4 +118,4 @@ With HAPI v8.10.0 + UCUM fragment seeded + remote terminology services reachable
 
 ## License
 
-Apache 2.0
+[MIT](LICENSE)
