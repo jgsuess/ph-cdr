@@ -31,36 +31,41 @@ docker compose down -v && docker compose up -d
 
 ## Architecture
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│  docker-compose.yml                                          │
-│                                                              │
-│  ┌──────────────────────────┐   ┌────────────────────────┐  │
-│  │  fhir (HAPI JPA v8.10.0) │   │  db (PostgreSQL 17)     │  │
-│  │  port 8080               │──▶│  hapi.postgres.data vol │  │
-│  │  hapiproject/hapi:v8.10.0│   │  pg_isready healthcheck │  │
-│  │                          │   └────────────────────────┘  │
-│  │  Configs (mounted):      │                               │
-│  │  hapi/application.yaml   │                               │
-│  │  hapi/mdm-rules.json     │                               │
-│  │                          │                               │
-│  │  IGs loaded on boot:     │                               │
-│  │  ● fhir.ph.core          │                               │
-│  │  ● fhir.ph.ereferral     │                               │
-│  └──────────────────────────┘                               │
-└──────────────────────────────────────────────────────────────┘
-         ▲
-         │ scripts/upload.sh
-         │ (curl PUT/POST example resources)
-         │
-   ┌─────┴──────────┐   ┌──────────────────────────┐
-   │  ph-core pkg   │   │  ph-ereferral examples   │
-   │  (package.tgz) │   │  (GitHub raw)            │
-   └────────────────┘   └──────────────────────────┘
+```mermaid
+graph TB
+    subgraph compose["docker-compose.yml"]
+        fhir["<b>fhir</b> · ph-cdr-hapi<br/>hapiproject/hapi:v8.10.0-1<br/>:8080"]
+        db[("<b>db</b> · PostgreSQL 17<br/>hapi.postgres.data")]
+        fhir -->|"depends_on healthy"| db
+    end
 
-Outbound terminology services:
-  tx.fhirlab.net/fhir   — LOINC, SNOMED CT (CSIRO Ontoserver)
-  tx.fhir.org/r4        — UCUM fallback (HL7 reference server)
+    subgraph configs["Mounted configs"]
+        appyaml["hapi/application.yaml"]
+        mdmjson["hapi/mdm-rules.json"]
+    end
+    appyaml -->|"/app/config/application.yaml"| fhir
+    mdmjson -->|"/app/config/mdm-rules.json"| fhir
+
+    subgraph igs["IGs loaded on first boot"]
+        phcore["fhir.ph.core"]
+        pheref["fhir.ph.ereferral"]
+    end
+    igs -->|"STORE_AND_INSTALL"| fhir
+
+    subgraph upload["scripts/upload.sh"]
+        ucum["1b · Seed UCUM fragment"]
+        pkgtgz["2 · ph-core package.tgz"]
+        ghraw["3 · ph-ereferral GitHub raw"]
+        patch["2b · Patch Provenance BCP:13"]
+        pkgtgz --> patch
+    end
+    upload -->|"PUT / POST"| fhir
+
+    subgraph terminology["Remote terminology services"]
+        fhirlab["tx.fhirlab.net<br/>LOINC · SNOMED CT"]
+        hl7tx["tx.fhir.org/r4<br/>UCUM fallback"]
+    end
+    fhir -->|"validate-code"| terminology
 ```
 
 ## Philippine Implementation Guides
