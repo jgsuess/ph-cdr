@@ -32,9 +32,15 @@ hapi:
     # See docs/configuration.md#terminology-deferred-indexing
     defer_indexing_for_codesystems_of_size: 100000
 
-    # Repository validation: rejects writes that fail active profile conformance.
-    # Note: profiles with status=draft are loaded but not enforced on writes.
+    # Allow packages with status=draft to be installed. Without this, HAPI silently
+    # skips all StructureDefinitions, ValueSets, and CodeSystems that carry
+    # status=draft, which causes profile validation to silently pass for those types
+    # (no rule loaded → no enforcement). PH Core and PH eReferral ship draft resources.
     # See docs/known-issues.md#c-profile-validation-inactive-for-draft-status-igs
+    validate_resource_status_for_package_upload: false
+
+    # Repository validation: rejects writes that fail active profile conformance.
+    # See docs/configuration.md#validation
     validation:
       requests_enabled: true
       responses_enabled: false
@@ -85,6 +91,7 @@ hapi:
         packageUrl: "https://jgsuess.github.io/ph-core/${PH_CORE_VERSION:0.1.1}/package.tgz"
         dependencyExcludes:
           - "hl7.fhir.uv.extensions"
+          - "hl7.fhir.uv.extensions.r4"
           - "hl7.terminology"
       ph_ereferral:
         name: fhir.ph.ereferral
@@ -95,5 +102,25 @@ hapi:
         packageUrl: "https://jgsuess.github.io/ph-ereferral/${PH_EREFERRAL_VERSION:0.3.1}/package.tgz"
         dependencyExcludes:
           - "hl7.fhir.uv.extensions"
+          - "hl7.fhir.uv.extensions.r4"
           - "hl7.terminology"
           - "fhir.ph.core"
+      # hl7.fhir.uv.extensions.r4 loaded explicitly to provide R4-transformed extension
+      # definitions. The base hl7.fhir.uv.extensions package is R5-centric and causes
+      # type mismatches on Device, DeviceDefinition, and related resources when loaded
+      # in R4 mode (e.g. device-implantStatus expects code in R4 but CodeableConcept in
+      # R5). Loading the .r4 variant instead provides correct R4 type definitions.
+      # Both variants are excluded from ph_core/ph_ereferral transitive deps above to
+      # prevent double-loading. See docs/known-issues.md#d-hl7-extensions-pack-r4-vs-r5
+      hl7_extensions_r4:
+        name: hl7.fhir.uv.extensions.r4
+        version: "5.3.0"
+        reloadExisting: false
+        installMode: STORE_AND_INSTALL
+        fetchDependencies: true
+        installResourceTypes:
+          - StructureDefinition
+          - SearchParameter
+        dependencyExcludes:
+          - "hl7.terminology.r5"
+          - "hl7.terminology.r4"
