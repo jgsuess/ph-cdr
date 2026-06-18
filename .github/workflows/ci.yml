@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    name: Validate configuration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate docker-compose.yml
+        run: docker compose config --quiet
+
+      - name: Validate JSON files
+        run: |
+          python3 -m json.tool hapi/mdm-rules.json    > /dev/null
+          python3 -m json.tool hapi/ucum-fragment.json > /dev/null
+
+      - name: Validate YAML files
+        run: |
+          pip install pyyaml --quiet
+          python3 -c "
+          import yaml
+          with open('hapi/application.yaml') as f:
+              yaml.safe_load(f)
+          print('hapi/application.yaml OK')
+          "
+
+      - name: ShellCheck upload script
+        run: shellcheck scripts/upload.sh
+
+  integration:
+    name: Integration test
+    runs-on: ubuntu-latest
+    needs: validate
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start stack
+        run: docker compose up -d
+
+      - name: Wait for HAPI (up to 8 min)
+        run: |
+          for i in $(seq 1 48); do
+            if curl -sf http://localhost:8080/fhir/metadata > /dev/null 2>&1; then
+              echo "HAPI ready after $((i * 10))s"
+              exit 0
+            fi
+            echo "  waiting... ($((i * 10))s)"
+            sleep 10
+          done
+          echo "Timed out — HAPI logs:"
+          docker compose logs fhir --tail 40
+          exit 1
+
+      - name: Run upload script
+        run: bash scripts/upload.sh
+
+      - name: Check results
+        run: |
+          RESULT_DIR=$(ls -d fhir-upload-results-* | tail -1)
+          python3 - "$RESULT_DIR/summary.json" <<'PY'
+          import sys, json
+          d = json.load(open(sys.argv[1]))
+          total, passed, failed = d['total'], d['passed'], d['failed']
+          print(f"Results: {passed}/{total} passed")
+          if failed > 0:
+              print(f"FAILED: {failed} resource(s) did not upload cleanly")
+              sys.exit(1)
+          print("All resources uploaded successfully")
+          PY
+
+      - name: Upload report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: upload-report
+          path: fhir-upload-results-*/
+
+      - name: Stop stack
+        if: always()
+        run: docker compose down -v
