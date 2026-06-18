@@ -1,3 +1,9 @@
+logging:
+  # Load external Logback config for structured JSON access logging.
+  # The file is injected at deploy time via Docker Compose configs: — see docker-compose.yml.
+  # See docs/access-logging.md for field reference and log consumption guidance.
+  config: file:/app/config/logback-spring.xml
+
 spring:
   datasource:
     # Connects to the PostgreSQL container defined in docker-compose.yml.
@@ -55,6 +61,25 @@ hapi:
     # Requires hibernate.search.enabled: true above.
     advanced_lucene_indexing: true
     search_index_full_text_enabled: true
+
+    # Structured per-request access logging for statistical accounting.
+    # The LoggingInterceptor is active by default in the HAPI starter; these keys
+    # configure the format and logger name. Output is routed to JSON via logback-spring.xml.
+    # Fields: HTTP verb/path, FHIR operation type/name, resource, remote IP, forwarded-for,
+    # User-Agent, request ID, query params, processing time. Request body is NOT logged.
+    # See docs/access-logging.md for field reference and consumption guidance.
+    logger:
+      name: fhirtest.access
+      format: "verb=${requestVerb} path=${servletPath} op=${operationType} opName=${operationName} resource=${idOrResourceName} remoteAddr=${remoteAddr} forwardedFor=${requestHeader.x-forwarded-for} userAgent=${requestHeader.user-agent} requestId=${requestId} params=${requestParameters} processingMs=${processingTimeMillis}"
+      error_format: "verb=${requestVerb} path=${requestUrl} op=${operationType} resource=${idOrResourceName} remoteAddr=${remoteAddr} requestId=${requestId} error=${exceptionMessage}"
+      log_exceptions: true
+
+    # custom_content_path is DISABLED — broken in HAPI 8.10.0 (trailing slash bug).
+    # CustomContentFilesConfigurer strips the trailing slash from the path, causing
+    # Spring's ResourceHandlerRegistration to throw "does not end with slash".
+    # The fix is merged to HAPI master. Re-enable when a fixed release is published.
+    # See docs/known-issues.md#g-custom-content-path-broken-in-hapi-8100
+    # custom_content_path: /app/config/
 
     # Allow references to resources hosted on external FHIR servers.
     # Required by Philippine IGs that reference national registry identifiers.

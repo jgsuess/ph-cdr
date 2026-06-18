@@ -17,6 +17,17 @@ services:
   fhir:
     container_name: ph-cdr-hapi
     image: "hapiproject/hapi:v8.10.0-1"
+    # Log rotation prevents the Docker json-file log from filling the host volume.
+    # Keeps the last 5 rotated files of up to 20 MB each (100 MB max total).
+    # Access log JSON lines and application log lines both go here; downstream
+    # consumers filter by logger_name == "fhirtest.access".
+    # To ship logs externally instead, replace driver with fluentd/loki/syslog
+    # and remove the options block. See docs/access-logging.md#log-shipping.
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
     ports:
       - "8080:8080"
     # Explicit DNS avoids systemd-resolved stub resolver failures on Ubuntu hosts.
@@ -35,8 +46,20 @@ services:
         target: /app/config/application.yaml
       - source: hapi-mdm-rules
         target: /app/config/mdm-rules.json
+      # Logback config for structured JSON access logging on fhirtest.access logger.
+      # See docs/access-logging.md and hapi/logback-spring.xml.
+      - source: hapi-logback
+        target: /app/config/logback-spring.xml
     volumes:
       - hapi.lucene.data:/data/hapi/lucenefiles
+      # Custom content for HAPI web UI — mounts hapi/custom/ so the access logging
+      # notice (custom/about.html) is served by the HAPI about-page JS.
+      # See docs/access-logging.md#user-notice and hapi.fhir.custom_content_path in
+      # hapi/application.yaml.
+      - type: bind
+        source: ./hapi/custom
+        target: /app/config/custom
+        read_only: true
     depends_on:
       lucene-init:
         condition: service_completed_successfully
@@ -68,3 +91,5 @@ configs:
     file: hapi/application.yaml
   hapi-mdm-rules:
     file: hapi/mdm-rules.json
+  hapi-logback:
+    file: hapi/logback-spring.xml

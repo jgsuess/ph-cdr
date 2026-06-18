@@ -192,3 +192,49 @@ After downloading the ph-core package, `scripts/upload.sh` (step 2b) post-proces
 ### Long-term fix
 
 A bug report should be filed with the ph-core IG authors to correct `provenance-single-example.fsh` to use `#application/xml` instead of `#xml`. Once fixed and a new package version is published, the patch in the upload script can be removed.
+
+---
+
+## (g) `custom_content_path` Broken in HAPI 8.10.0 (Trailing Slash Bug)
+
+### What the error is
+
+Setting `hapi.fhir.custom_content_path` in `hapi/application.yaml` causes HAPI to crash on startup with:
+
+```
+Resource location does not end with slash: file:/app/config/custom
+```
+
+### Root cause
+
+`CustomContentFilesConfigurer` in the HAPI starter (commit `19f1e2208ed`) unconditionally strips the trailing slash from the configured path before constructing a `FileUrlResource`. Spring's `ResourceHandlerRegistration.addResourceLocations()` then rejects the URL because it doesn't end with `/`.
+
+The bug is:
+```java
+// Broken — strips the slash
+if (customContentPath.endsWith("/"))
+    customContentPath = customContentPath.substring(0, customContentPath.lastIndexOf('/'));
+```
+
+It should be:
+```java
+// Fixed — ensures trailing slash
+if (!customContentPath.endsWith("/")) customContentPath = customContentPath + "/";
+```
+
+The fix is merged to the HAPI starter `master` branch but is not yet included in any released Docker image (latest: v8.10.0-1).
+
+### Impact
+
+The web UI logging notice (`hapi/custom/about.html`) and NTHC logo cannot be injected via this mechanism in HAPI v8.10.0. The `custom_content_path` key is commented out in `hapi/application.yaml` to prevent startup failure.
+
+### When to re-enable
+
+Monitor HAPI Docker Hub for a release after `2026-06-18`. Once a release including the `master` fix is published:
+
+1. Upgrade `image:` in `docker-compose.yml` to the new version
+2. Uncomment `custom_content_path: /app/config/` in `hapi/application.yaml`
+3. Confirm the bind mount `./hapi/custom → /app/config/custom` is present in `docker-compose.yml`
+4. Verify the notice appears on the About page at `http://localhost:8080`
+
+The `hapi/custom/about.html` and `hapi/custom/nthc-logo.png` files are already in place.

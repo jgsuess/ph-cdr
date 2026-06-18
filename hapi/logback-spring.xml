@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration scan="true" scanPeriod="30 seconds">
+
+  <!-- Spring Boot default patterns for the root/application log -->
+  <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+  <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+
+  <!--
+    Structured JSON appender for the FHIR access log.
+    Uses Logback's built-in JsonEncoder (available since Logback 1.3.x; bundled
+    in hapiproject/hapi as logback-classic-1.5.x). No extra dependency needed.
+
+    Each access log entry appears on stdout as one JSON object per line.
+    Consumers filter by logger_name == "fhirtest.access".
+    The FHIR-specific fields (op, resource, remoteAddr, etc.) appear in "message".
+    See docs/access-logging.md for field reference.
+  -->
+  <appender name="ACCESS_JSON" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder class="ch.qos.logback.classic.encoder.JsonEncoder"/>
+  </appender>
+
+  <!--
+    fhirtest.access is the SLF4J logger name used by HAPI's LoggingInterceptor
+    (configured via hapi.fhir.logger.name in application.yaml).
+    additivity="false" prevents these lines from also appearing in the root logger,
+    avoiding duplicate entries in docker logs output.
+  -->
+  <logger name="fhirtest.access" level="INFO" additivity="false">
+    <appender-ref ref="ACCESS_JSON"/>
+  </logger>
+
+  <!-- Root logger: application warnings/errors to standard console (plain text) -->
+  <root level="WARN">
+    <appender-ref ref="CONSOLE"/>
+  </root>
+
+</configuration>

@@ -1,0 +1,42 @@
+<div style="margin-top:20px;">
+  <div style="display:flex; align-items:center; gap:16px; margin-bottom:12px;">
+    <img src="content/custom/nthc-logo.png"
+         alt="National Telehealth Center logo"
+         style="height:64px; width:auto; flex-shrink:0;">
+    <div>
+      <h4 style="margin:0 0 4px 0;">Philippine CDR — FHIR R4 Server</h4>
+      <p style="margin:0; color:#666; font-size:0.9em;">
+        National Telehealth Center &middot; University of the Philippines Manila
+      </p>
+    </div>
+  </div>
+
+  <div class="panel panel-info" style="border-color:#31708f;">
+    <div class="panel-heading" style="background-color:#d9edf7; color:#31708f; font-weight:bold;">
+      <span class="glyphicon glyphicon-info-sign" style="margin-right:6px;"></span>
+      Access Logging Notice
+    </div>
+    <div class="panel-body" style="background-color:#f4f9fd; color:#31708f;">
+      <p>
+        Access to this FHIR server is <strong>logged for statistical and accounting purposes</strong>.
+        Each request is recorded with the following metadata:
+      </p>
+      <ul>
+        <li>FHIR operation type (e.g. read, search, create, update)</li>
+        <li>Resource type accessed (e.g. Patient, Encounter, Observation)</li>
+        <li>Client IP address and forwarded address (if behind a proxy)</li>
+        <li>HTTP User-Agent string identifying the client software</li>
+        <li>Request timestamp and processing duration</li>
+        <li>Query parameters</li>
+      </ul>
+      <p>
+        <strong>Resource content is not logged.</strong>
+        No clinical data, patient identifiers, or FHIR resource bodies are captured in the access log.
+      </p>
+      <p style="margin-bottom:0;">
+        These logs are used for usage analysis and governance reporting.
+        If you have questions about data handling, please contact the server administrator.
+      </p>
+    </div>
+  </div>
+</div>
