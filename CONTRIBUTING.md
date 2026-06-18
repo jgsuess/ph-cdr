@@ -1,5 +1,14 @@
 # Contributing
 
+## Scope of this repository
+
+This repository contains only the CDR stack configuration — the Docker Compose file, HAPI server settings, MDM rules, and upload tooling. It does not bundle or redistribute any IG content.
+
+The Philippine FHIR Implementation Guides (`fhir.ph.core`, `fhir.ph.ereferral`) are maintained separately and downloaded at runtime from their respective GitHub Pages package registries. Those packages are derived from open-source IG material and are subject to their own licenses. Refer to the source repositories for details:
+
+- [jgsuess/ph-core](https://github.com/jgsuess/ph-core)
+- [jgsuess/ph-ereferral](https://github.com/jgsuess/ph-ereferral)
+
 ## Status
 
 This repository is **experimental**. It is not currently accepting external contributions.

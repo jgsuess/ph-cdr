@@ -118,4 +118,6 @@ With HAPI v8.10.0 + UCUM fragment seeded + remote terminology services reachable
 
 ## License
 
-[MIT](LICENSE)
+The stack configuration in this repository (Docker Compose, HAPI settings, upload scripts) is released under the [MIT License](LICENSE).
+
+This repository does not bundle IG content. The Philippine FHIR packages (`fhir.ph.core`, `fhir.ph.ereferral`) are downloaded at runtime and are subject to their own licenses — see [jgsuess/ph-core](https://github.com/jgsuess/ph-core) and [jgsuess/ph-ereferral](https://github.com/jgsuess/ph-ereferral).
