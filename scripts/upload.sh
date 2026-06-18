@@ -369,7 +369,8 @@ done
 # Upload any remaining ph-core files not caught by ordering
 while IFS= read -r f; do
   name=$(basename "$f" .json)
-  if [[ ! " ${uploaded_phcore[*]} " =~ " ${name} " ]]; then
+  pattern=" ${name} "
+  if [[ ! " ${uploaded_phcore[*]} " =~ $pattern ]]; then
     upload_resource "$name" "ph-core" "$f"
   fi
 done < <(find "$OUT_DIR/payloads/ph-core/" -name "*.json" | sort)

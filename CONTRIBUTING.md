@@ -24,6 +24,24 @@ If you encounter a problem running the stack or have a question about the config
 - Relevant log output (`docker compose logs fhir`)
 - Steps to reproduce
 
+## Commit message format
+
+All commits must follow [conventional commits](https://www.conventionalcommits.org/) format:
+
+```
+<type>(<scope>): <short description>
+```
+
+Types: `feat` | `fix` | `docs` | `ci` | `chore` | `refactor` | `test` | `perf` | `revert`
+
+Install the local `commit-msg` hook to catch this before pushing:
+
+```bash
+bash scripts/install-hooks.sh
+```
+
+Pull requests are checked automatically by the `commitlint` CI workflow.
+
 ## Future contributions
 
 Once the stack stabilises, this policy will be updated. Watch this repository for updates.

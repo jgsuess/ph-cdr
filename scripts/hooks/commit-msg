@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Validates conventional commit message format.
+# Install: bash scripts/install-hooks.sh
+
+msg=$(cat "$1")
+
+# Strip comments and trailing whitespace
+msg=$(echo "$msg" | sed '/^#/d' | sed 's/[[:space:]]*$//')
+
+# Allow merge commits and revert commits verbatim
+if echo "$msg" | grep -qE "^(Merge|Revert) "; then
+  exit 0
+fi
+
+pattern="^(feat|fix|docs|style|refactor|test|chore|ci|perf|revert)(\([^)]+\))?(!)?: .{1,100}$"
+
+if ! echo "$msg" | head -1 | grep -qE "$pattern"; then
+  echo ""
+  echo "  Commit message does not follow conventional commits format."
+  echo ""
+  echo "  Expected:  <type>(<scope>): <short description>"
+  echo "  Example:   feat(mdm): add Immunization MDM support"
+  echo ""
+  echo "  Types: feat | fix | docs | style | refactor | test | chore | ci | perf | revert"
+  echo ""
+  echo "  Your message:"
+  echo "  $(echo "$msg" | head -1)"
+  echo ""
+  exit 1
+fi

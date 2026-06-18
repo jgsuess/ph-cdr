@@ -1,0 +1,43 @@
+name: Commit lint
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  commitlint:
+    name: Validate commit messages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check all commits in PR
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.event.pull_request.head.sha }}"
+          PATTERN="^(feat|fix|docs|style|refactor|test|chore|ci|perf|revert)(\([^)]+\))?(!)?: .{1,100}$"
+          FAILED=0
+
+          while IFS= read -r sha; do
+            msg=$(git log --format=%s -n 1 "$sha")
+            # Allow merge commits
+            if echo "$msg" | grep -qE "^(Merge|Revert) "; then
+              continue
+            fi
+            if ! echo "$msg" | grep -qE "$PATTERN"; then
+              echo "  FAIL [$sha]: $msg"
+              FAILED=$((FAILED + 1))
+            else
+              echo "  OK   [$sha]: $msg"
+            fi
+          done < <(git log --format=%H "$BASE..$HEAD")
+
+          if [ "$FAILED" -gt 0 ]; then
+            echo ""
+            echo "$FAILED commit(s) do not follow conventional commits format."
+            echo "Expected: <type>(<scope>): <description>"
+            echo "Types: feat | fix | docs | style | refactor | test | chore | ci | perf | revert"
+            exit 1
+          fi
