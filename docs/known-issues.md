@@ -85,34 +85,64 @@ The `dns:` block is safe to leave in on all platforms — it is harmless on non-
 
 ## (c) Profile Validation Inactive for Draft-Status IGs
 
-### Why this happens
+### Status: resolved via `validate_resource_status_for_package_upload: false`
 
-HAPI enforces profile validation only for StructureDefinitions with `"status": "active"`. This is correct FHIR behaviour: draft profiles are works-in-progress and are not intended to be binding constraints in a production server.
+Setting `validate_resource_status_for_package_upload: false` in `hapi/application.yaml` causes HAPI to install all StructureDefinitions regardless of status. This means ph-ereferral's draft profiles are stored and enforced.
 
-All current ph-ereferral StructureDefinitions have `"status": "draft"`. As a result:
-- Resources claiming `meta.profile = "https://fhir.doh.gov.ph/pheref/StructureDefinition/..."` are *not* rejected if they violate the profile
-- HAPI loads and stores the profiles, but the `RequestValidatingInterceptor` does not enforce them
+Without this setting (the HAPI default is `true`), HAPI silently skips installing any conformance resource with `"status": "draft"` or `"status": "retired"`. This caused:
+- ph-ereferral StructureDefinitions not installed → no validation rules loaded → all resources accepted regardless of profile conformance
+- 29/65 example uploads silently not validated
 
-### What still works
-
-- Profiles are stored and searchable: `GET /fhir/StructureDefinition?url=https://fhir.doh.gov.ph/pheref/...`
-- Explicit `$validate` works against draft profiles: `POST /fhir/Patient/$validate?profile=<url>`
-- MDM deduplication is independent of profile status and always active
-- ph-core profiles with `status: active` are enforced normally
-
-### Workaround
-
-Call `$validate` explicitly in client code before or after writing resources to validate against ph-ereferral profiles. The `$validate` operation honours draft profiles.
-
-Alternatively, post-process the ph-ereferral IG package `.tgz` to change `"status": "draft"` to `"status": "active"` in all StructureDefinitions before loading (requires rebuilding the package).
-
-### Expected resolution
-
-Once ph-ereferral advances to formal publication with `status: active`, this issue resolves automatically with no configuration change needed.
+The setting is now applied in `hapi/application.yaml`. No further workaround is needed.
 
 ---
 
-## (d) Transaction Bundle Storage
+## (d) HL7 Extensions Pack: R4 vs R5 Type Mismatches
+
+### What the error is
+
+The HL7 Extensions Pack ships in two variants:
+
+- `hl7.fhir.uv.extensions` — R5-centric base; extension definitions use R5 data types (e.g. `device-implantStatus` is `CodeableConcept` in R5)
+- `hl7.fhir.uv.extensions.r4` — R4-transformed variant; all extension definitions are re-stated using R4-compatible types
+
+When `hl7.fhir.uv.extensions` is loaded in an R4 HAPI server (or when neither pack is loaded and HAPI falls back to its built-in R4 base spec), some extensions carry the *wrong* R4 type. For example, HAPI's base R4 spec defines `device-implantStatus` as using `code`, but real-world R4 resources (following the extensions pack guidance) supply `CodeableConcept`. This causes:
+
+```
+HTTP 422: The Extension 'http://hl7.org/fhir/StructureDefinition/device-implantStatus'
+definition allows for the types [code] but found type CodeableConcept
+```
+
+Affects Device, DeviceDefinition, and related resource types that use Device-specific extensions from the extensions pack.
+
+### The fix applied here
+
+`hl7.fhir.uv.extensions.r4 v5.3.0` is loaded as an explicit IG entry in `hapi/application.yaml`:
+
+```yaml
+hl7_extensions_r4:
+  name: hl7.fhir.uv.extensions.r4
+  version: "5.3.0"
+  installMode: STORE_AND_INSTALL
+  installResourceTypes: [StructureDefinition, SearchParameter]
+  dependencyExcludes: [hl7.terminology.r5, hl7.terminology.r4]
+```
+
+Both `hl7.fhir.uv.extensions` and `hl7.fhir.uv.extensions.r4` are also excluded from the `ph_core` and `ph_ereferral` transitive dependency chains to prevent double-loading.
+
+Only `StructureDefinition` and `SearchParameter` resources are installed (not ValueSets or CodeSystems), keeping the install lean. Terminology validation is handled via the remote terminology services.
+
+### Verification
+
+`tests/test-extensions-pack.sh` covers four cases:
+1. `device-implantStatus` StructureDefinition at version 5.3.0 is present (confirms pack loaded)
+2. Device with `device-implantStatus` as `valueCode: "functional"` → HTTP 201 (correct type accepted)
+3. Device with `device-implantStatus` as `valueString` → HTTP 422 (wrong type rejected, confirms enforcement active)
+4. Plain Device with no extensions → HTTP 201 (regression guard)
+
+---
+
+## (e) Transaction Bundle Storage
 
 ### What the error is
 
@@ -137,7 +167,7 @@ The ph-core package contains `Bundle/transaction-example`, which is a transactio
 
 ---
 
-## (e) Provenance BCP:13 MIME Type Fix (patch applied in upload script)
+## (f) Provenance BCP:13 MIME Type Fix (patch applied in upload script)
 
 ### What the error is
 

@@ -76,6 +76,9 @@ jobs:
           print("All resources uploaded successfully")
           PY
 
+      - name: Test HL7 extensions pack (.r4)
+        run: bash tests/test-extensions-pack.sh
+
       - name: Upload report on failure
         if: failure()
         uses: actions/upload-artifact@v4
