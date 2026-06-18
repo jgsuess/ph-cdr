@@ -11,8 +11,16 @@ spring:
     properties:
       # HAPI's PostgreSQL-specific Hibernate dialect. Required — do not substitute.
       hibernate.dialect: ca.uhn.fhir.jpa.model.dialect.HapiFhirPostgresDialect
-      # Disable Hibernate Search (Lucene/ES full-text). Not needed for FHIR search.
-      hibernate.search.enabled: false
+      # Hibernate Search (Lucene backend) enables _text and _content FHIR search params.
+      # HapiHSearchAnalysisConfigurers$HapiLuceneAnalysisConfigurer registers HAPI's custom
+      # analyzers (exactAnalyzer, standardAnalyzer, autocomplete* etc.) that Lucene requires
+      # at bootstrap. The index is written to /app/target/lucenefiles, mounted as a volume.
+      # See docs/configuration.md#hibernate-search--lucene
+      hibernate.search.enabled: true
+      hibernate.search.backend.type: lucene
+      hibernate.search.backend.analysis.configurer: ca.uhn.fhir.jpa.search.HapiHSearchAnalysisConfigurers$HapiLuceneAnalysisConfigurer
+      hibernate.search.backend.directory.type: local-filesystem
+      hibernate.search.backend.directory.root: /data/hapi/lucenefiles
 
 hapi:
   fhir:
@@ -36,6 +44,11 @@ hapi:
     # See docs/configuration.md#hapimdm-rulesjson
     mdm_enabled: true
     mdm_rules_json_location: "mdm-rules.json"
+
+    # Enable extended Lucene indexing and _text/_content search parameters.
+    # Requires hibernate.search.enabled: true above.
+    advanced_lucene_indexing: true
+    search_index_full_text_enabled: true
 
     # Allow references to resources hosted on external FHIR servers.
     # Required by Philippine IGs that reference national registry identifiers.

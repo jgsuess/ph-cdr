@@ -1,5 +1,15 @@
 services:
 
+  # One-shot init: sets ownership of the Lucene volume for user 65532 (the HAPI
+  # distroless image's nonroot user). Docker named volumes are created as root:root;
+  # without this step HAPI cannot create index subdirectories and fails to boot.
+  lucene-init:
+    image: "busybox:stable"
+    user: root
+    command: ["sh", "-c", "mkdir -p /data/hapi/lucenefiles && chown -R 65532:65532 /data/hapi/lucenefiles"]
+    volumes:
+      - hapi.lucene.data:/data/hapi/lucenefiles
+
   # HAPI FHIR R4 server with MDM and repository validation enabled.
   # Packages fhir.ph.core and fhir.ph.ereferral are loaded on first boot.
   # Access at http://localhost:8080/fhir
@@ -25,7 +35,11 @@ services:
         target: /app/config/application.yaml
       - source: hapi-mdm-rules
         target: /app/config/mdm-rules.json
+    volumes:
+      - hapi.lucene.data:/data/hapi/lucenefiles
     depends_on:
+      lucene-init:
+        condition: service_completed_successfully
       db:
         condition: service_healthy
 
@@ -47,6 +61,7 @@ services:
 
 volumes:
   hapi.postgres.data:
+  hapi.lucene.data:
 
 configs:
   hapi-application:
