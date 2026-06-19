@@ -6,7 +6,7 @@ ph-cdr logs every inbound FHIR request for statistical accounting and governance
 
 ## How it works
 
-HAPI's built-in `LoggingInterceptor` intercepts every request and emits one record per request to an SLF4J logger named `fhirtest.access`. A Logback configuration (`hapi/logback-spring.xml`) routes that logger to stdout as **one JSON object per line** using the Logstash encoder.
+HAPI's built-in `LoggingInterceptor` intercepts every request and emits one record per request to an SLF4J logger named `fhirtest.access`. A Logback configuration (`hapi/logback-spring.xml`) routes that logger to stdout as **one JSON object per line** using Logback's built-in `JsonEncoder` (no extra dependency — `logback-classic` is bundled in the HAPI image).
 
 This is entirely config-driven — no custom Java code is involved. The configuration follows the akkadakka pattern:
 
@@ -16,23 +16,76 @@ This is entirely config-driven — no custom Java code is involved. The configur
 | `hapi/logback-spring.xml` | `/app/config/logback-spring.xml` | Routes `fhirtest.access` to JSON stdout appender |
 | `hapi/custom/about.html` | `/app/config/custom/about.html` | Logging notice shown in HAPI web UI |
 
+### Docker Compose wiring
+
+`docker-compose.yml` wires the logging config into the container via the `configs:` top-level block and the `fhir.configs:` service entries:
+
+```yaml
+configs:
+  hapi-logback:
+    file: hapi/logback-spring.xml   # ← source on the Docker host
+
+services:
+  fhir:
+    configs:
+      - source: hapi-logback
+        target: /app/config/logback-spring.xml   # ← where HAPI reads it
+```
+
+`application.yaml` tells Spring Boot where to find the Logback config before the application context starts:
+
+```yaml
+logging:
+  config: file:/app/config/logback-spring.xml
+```
+
+Container stdout (where Logback writes) is captured by Docker's **json-file** logging driver, which rotates the log to prevent disk exhaustion:
+
+```yaml
+services:
+  fhir:
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"   # rotate at 20 MB
+        max-file: "5"     # keep 5 rotated files (100 MB max total)
+```
+
+The rotated files live at `/var/lib/docker/containers/<id>/<id>-json.log` on the Docker host. Each line in those files is Docker's envelope:
+
+```json
+{"log":"{...logback JSON...}\n","stream":"stdout","time":"2026-06-19T..."}
+```
+
+`docker compose logs` unwraps the envelope and prepends a service prefix, so what you see on screen (and what `grep` works against) is the raw Logback JSON line.
+
 ---
 
 ## Log format
 
-Each access log entry is a JSON object on stdout. The outer envelope is standard Logstash format:
+Each access log entry is a JSON object on stdout. The envelope is Logback's `JsonEncoder` format:
 
 ```json
 {
-  "@timestamp": "2026-06-18T07:30:12.345Z",
-  "@version": "1",
+  "sequenceNumber": 42,
+  "timestamp": 1750320612345,
+  "nanoseconds": 345000000,
+  "level": "INFO",
+  "threadName": "http-nio-8080-exec-2",
+  "loggerName": "fhirtest.access",
+  "context": {"name": "default", "birthdate": 1750320000000, "properties": {}},
+  "mdc": {},
   "message": "verb=GET path=/fhir/Patient/123 op=read opName= resource=123 ...",
-  "logger_name": "fhirtest.access",
-  "level": "INFO"
+  "throwable": null
 }
 ```
 
-The `message` field contains a structured `key=value` string with all FHIR-specific accounting fields. Filter on `logger_name == "fhirtest.access"` to isolate access records from HAPI application log lines.
+Key field notes:
+- `timestamp` is Unix epoch milliseconds (not ISO-8601). Convert: `python3 -c "import datetime; print(datetime.datetime.fromtimestamp(1750320612))"`.
+- `loggerName` (camelCase) is how the field appears — use this when writing log queries.
+- `message` contains the structured `key=value` FHIR accounting fields.
+
+Filter on `loggerName == "fhirtest.access"` to isolate access records from HAPI application log lines.
 
 ### Fields in `message`
 
@@ -73,16 +126,22 @@ The `message` field contains a structured `key=value` string with all FHIR-speci
 
 ### Docker Compose (local)
 
+`docker compose logs` prepends a `<service>  | ` prefix to each line. Strip it with `awk '{$1=$2=""; print substr($0,3)}'` before parsing JSON.
+
 ```bash
-# Stream access lines only
+# Stream access lines only (no JSON parsing needed)
 docker compose logs fhir --follow | grep '"fhirtest.access"'
 
-# Pretty-print a single access line
-docker compose logs fhir 2>/dev/null | grep '"fhirtest.access"' | head -1 | python3 -m json.tool
+# Pretty-print a single access line (strip the compose prefix first)
+docker compose logs fhir 2>/dev/null \
+  | grep '"fhirtest.access"' | head -1 \
+  | awk '{$1=$2=""; print substr($0,3)}' \
+  | python3 -m json.tool
 
 # Count operations by type in the last 100 access lines
 docker compose logs fhir 2>/dev/null \
   | grep '"fhirtest.access"' | tail -100 \
+  | awk '{$1=$2=""; print substr($0,3)}' \
   | python3 -c "
 import sys, json, collections
 counts = collections.Counter()
@@ -101,12 +160,12 @@ for op, n in counts.most_common():
 
 ### Structured log shipping
 
-In production, ship container stdout to a log aggregator (ELK, Grafana Loki, AWS CloudWatch, etc.). Filter by `logger_name = "fhirtest.access"` to separate access records. The `message` field key=value pairs can be further parsed with a KV filter (Logstash `kv` filter, Loki's `pattern` parser, etc.).
+In production, ship container stdout to a log aggregator (ELK, Grafana Loki, AWS CloudWatch, etc.). Filter by `loggerName = "fhirtest.access"` to separate access records. The `message` field key=value pairs can be further parsed with a KV filter (Logstash `kv` filter, Loki's `pattern` parser, etc.).
 
 Example Loki LogQL:
 
 ```logql
-{container="ph-cdr-hapi"} | json | logger_name="fhirtest.access" | pattern `verb=<verb> path=<path> op=<op> <_>`
+{container="ph-cdr-hapi"} | json | loggerName="fhirtest.access" | pattern `verb=<verb> path=<path> op=<op> <_>`
 ```
 
 ---
