@@ -66,6 +66,39 @@ services:
       db:
         condition: service_healthy
 
+  # Monitor service: live dashboard + MDM remediation worker.
+  # Dashboard at http://localhost:8100
+  # - Receives Patient REST-hook webhooks from HAPI (near-real-time missing-profile counts)
+  # - Polls $mdm-query-links every POLL_INTERVAL_SECONDS (MDM links don't fire Subscriptions)
+  # - Serves a live SSE dashboard at GET /
+  # - POST /remediate/now triggers an immediate merge pass
+  # The service seeds its own Subscription resource into HAPI on startup (with retry).
+  # See monitor/main.py and docs/monitor.md
+  monitor:
+    build:
+      context: ./monitor
+      dockerfile: Dockerfile
+    container_name: ph-cdr-monitor
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+    ports:
+      - "8100:8000"
+    environment:
+      FHIR_BASE: "http://fhir:8080/fhir"
+      MONITOR_URL: "http://monitor:8000"
+      POLL_INTERVAL_SECONDS: "300"
+      AUTO_MERGE_THRESHOLD: "inf"
+    depends_on:
+      fhir:
+        condition: service_started
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+
   # PostgreSQL database backend for HAPI FHIR.
   db:
     image: "postgres:17.2-bookworm"

@@ -336,7 +336,7 @@ HAPI FHIR v8 introduced a regression (upstream issue [#7796](https://github.com/
 
 This causes false validation failures for Observations, MedicationRequests, and other resources that use UCUM units.
 
-**The fix**: uploading a `content: fragment` CodeSystem for `http://unitsofmeasure.org` to the HAPI database makes TRM use the stored resource instead of the classpath stub. TRM finds the listed codes and returns them as valid. This is uploaded by `scripts/upload.sh` as step 1b (after server ready, before example uploads).
+**The fix**: uploading a `content: fragment` CodeSystem for `http://unitsofmeasure.org` to the HAPI database makes TRM use the stored resource instead of the classpath stub. TRM finds the listed codes and returns them as valid. This is uploaded by `scripts/upload.sh` (Linux/macOS) or `scripts/upload.ps1` (Windows) as step 1b (after server ready, before example uploads).
 
 See [Known Issues](known-issues.md#a-hapi-v8100-ucum-chain-regression--issue-7796) for the full technical explanation.
 
@@ -377,12 +377,20 @@ If you add an IG that uses UCUM codes not in this list, add them to the `concept
 {"code": "mg/kg", "display": "Milligram per kilogram"}
 ```
 
-The `code` must be a valid UCUM expression. The `display` is informational only and does not affect validation. After editing, re-run `scripts/upload.sh` or PUT the file manually:
+The `code` must be a valid UCUM expression. The `display` is informational only and does not affect validation. After editing, re-run the upload script or PUT the file manually:
 
 ```bash
+# Linux/macOS
 curl -X PUT http://localhost:8080/fhir/CodeSystem/ucum-fragment \
   -H "Content-Type: application/fhir+json" \
   -d @hapi/ucum-fragment.json
+```
+
+```powershell
+# Windows PowerShell
+$bytes = [System.IO.File]::ReadAllBytes("hapi\ucum-fragment.json")
+Invoke-WebRequest http://localhost:8080/fhir/CodeSystem/ucum-fragment `
+  -Method PUT -Body $bytes -ContentType "application/fhir+json" -UseBasicParsing
 ```
 
 ### Content semantics and fallthrough
@@ -391,4 +399,4 @@ curl -X PUT http://localhost:8080/fhir/CodeSystem/ucum-fragment \
 
 ### Persistence
 
-This resource is stored in PostgreSQL via `PUT /CodeSystem/ucum-fragment`. It persists across container restarts (the PostgreSQL volume is preserved by `docker compose down`). If you wipe the database (`docker compose down -v`), re-run `scripts/upload.sh` before uploading any resources that use UCUM codes.
+This resource is stored in PostgreSQL via `PUT /CodeSystem/ucum-fragment`. It persists across container restarts (the PostgreSQL volume is preserved by `docker compose down`). If you wipe the database (`docker compose down -v`), re-run `scripts/upload.sh` (Linux/macOS) or `scripts/upload.ps1` (Windows) before uploading any resources that use UCUM codes.

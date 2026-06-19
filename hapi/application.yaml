@@ -51,6 +51,15 @@ hapi:
       requests_enabled: true
       responses_enabled: false
 
+    # FHIR R4 REST-hook subscriptions — used by the monitor service to receive
+    # a webhook on every Patient write for near-real-time missing-profile detection.
+    # MDM MATCH events are NOT emitted via Subscriptions (links are internal); the
+    # monitor service polls $mdm-query-links on a separate interval instead.
+    # See docs/configuration.md#subscriptions
+    subscription:
+      resthook_enabled: true
+      websocket_enabled: false
+
     # MDM: automatic patient deduplication using PhilSys/PhilHealth EIDs and
     # name+DOB similarity. Rules file is mounted at /app/config/mdm-rules.json.
     # See docs/configuration.md#hapimdm-rulesjson
