@@ -4,6 +4,7 @@ A HAPI FHIR v8.10.0 Docker stack for the Philippine healthcare ecosystem. Valida
 
 ## Quick Start
 
+**Linux / macOS**
 ```bash
 # 1. Clone and copy environment file
 git clone https://github.com/jgsuess/ph-cdr.git
@@ -23,6 +24,32 @@ bash scripts/upload.sh
 # 5. Browse
 open http://localhost:8080/fhir/metadata
 ```
+
+**Windows (PowerShell)**
+```powershell
+# 1. Clone and copy environment file
+git clone https://github.com/jgsuess/ph-cdr.git
+cd ph-cdr
+Copy-Item .env.example .env
+# edit .env if needed
+
+# 2. Start the stack
+docker compose up -d
+
+# 3. Wait for HAPI to finish loading IGs (~2 min on first boot)
+docker compose logs -f fhir
+
+# 4. Seed terminology and upload example resources
+.\scripts\upload.ps1
+
+# 5. Browse
+Start-Process http://localhost:8080/fhir/metadata
+```
+
+> **First-time PowerShell run?** If you see "running scripts is disabled", allow local scripts once:
+> ```powershell
+> Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+> ```
 
 **Clean restart** (wipes DB — required after upgrading HAPI major version):
 ```bash
@@ -52,7 +79,7 @@ graph TB
     end
     igs -->|"STORE_AND_INSTALL"| fhir
 
-    subgraph upload["scripts/upload.sh"]
+    subgraph upload["scripts/upload.sh · upload.ps1"]
         ucum["1b · Seed UCUM fragment"]
         pkgtgz["2 · ph-core package.tgz"]
         ghraw["3 · ph-ereferral GitHub raw"]
@@ -82,7 +109,7 @@ PH_CORE_VERSION=0.1.2 PH_EREFERRAL_VERSION=0.4.0 docker compose up -d
 
 ## Upload Results
 
-After running `scripts/upload.sh`, a timestamped report directory is created:
+After running `scripts/upload.sh` (Linux/macOS) or `scripts/upload.ps1` (Windows), a timestamped report directory is created:
 
 ```
 fhir-upload-results-YYYYMMDD-HHMMSS/
@@ -111,10 +138,16 @@ With HAPI v8.10.0 + UCUM fragment seeded + remote terminology services reachable
 ## Requirements
 
 - Docker Engine 24+ with Compose v2
-- `curl`, `python3` (for `scripts/upload.sh`)
+- Outbound internet access for terminology services and IG package download
 - ~2 GB disk (PostgreSQL data + IG packages)
 - ~2–4 min first-boot time for IG loading
-- Outbound internet access for terminology services and IG package download
+
+**Upload script requirements by platform**
+
+| Platform | Script | Prerequisites |
+|---|---|---|
+| Linux / macOS | `scripts/upload.sh` | `bash`, `curl`, `python3`, `tar` |
+| Windows 10/11 | `scripts/upload.ps1` | PowerShell 5.1+ (built-in), `tar.exe` (built-in since 1803) |
 
 ## License
 
