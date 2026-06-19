@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/jgsuess/ph-cdr/compare/v0.1.1...v0.1.2) (2026-06-19)
+
+
+### Features
+
+* **monitor:** live MDM dashboard, missing-profile detection, Windows support ([a4e5a8a](https://github.com/jgsuess/ph-cdr/commit/a4e5a8ae1712b6d5b63bffebce57e83f0fff26dc))
+
 ## [0.1.1](https://github.com/jgsuess/ph-cdr/compare/v0.1.0...v0.1.1) (2026-06-18)
 
 
